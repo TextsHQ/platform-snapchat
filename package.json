@@ -1,0 +1,36 @@
+{
+  "name": "@textshq/platform-twitter",
+  "version": "0.2.0",
+  "main": "./dist/index.js",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "prepack": "tsc",
+    "build": "yarn tsc",
+    "lint": "yarn eslint src --ext ts,tsx,js,jsx --cache"
+  },
+  "dependencies": {
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#5f2b77daa0449c65b57d4d6326ff890305a17dcf",
+    "eventsource": "^1.0.7",
+    "form-data": "^4.0.0",
+    "he": "^1.2.0",
+    "jsbi": "^4.3.0",
+    "lodash": "^4.17.20",
+    "mem": "^8.0.0",
+    "protobufjs": "^7.2.2",
+    "tough-cookie": "^4.0.0"
+  },
+  "devDependencies": {
+    "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#main",
+    "@types/eslint": "^8.4.10",
+    "@types/eventsource": "^1.1.5",
+    "@types/he": "^1.1.1",
+    "@types/lodash": "^4.14.168",
+    "@types/node": "^16.11.7",
+    "@types/tough-cookie": "^4.0.0",
+    "eslint": "^8.30.0",
+    "typescript": "^5.0.2"
+  },
+  "packageManager": "yarn@3.5.0"
+}
