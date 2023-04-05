@@ -117,8 +117,6 @@ export function mapThread(thread: SnapchatThread, currentUserSc: SnapchatUser): 
   let otherUser;
   if (participants.length === 2) otherUser = participants.filter(x => x.id !== currentUserSc.id)[0];
 
-  // console.log("PARTICIPANTS9768-123")
-  // console.log(participants)
   const mapped: Thread = {
     _original: JSON.stringify(thread),
     id: thread.convoId,
@@ -126,7 +124,7 @@ export function mapThread(thread: SnapchatThread, currentUserSc: SnapchatUser): 
     isReadOnly: false,
     lastReadMessageID: '1234',
     // imgURL: thread.avatar_image_https,
-    imgURL: otherUser ? otherUser.imgURL : 'https://i.imgur.com/isvfpxc.png',
+    imgURL: otherUser ? otherUser.imgURL : null,
     isUnread: null,
     messages: null,
     participants: {
@@ -244,11 +242,7 @@ function mapTweet(tweet: any, user = tweet.user): Tweet {
   return messageTweet
 }
 
-export function mapMessage(m: TwitterMessage, currentUserID: string, threadParticipants: TwitterUser[]): Message {
-  if (isNaN(parseInt(m.timestamp))) {
-    console.log("ERROR: INVALID TIMESTAMP FOR MESSAGE:", m)
-    m.timestamp = Date.now()
-  }
+export function mapMessage(m: SnapchatMessage, currentUserID: string, threadParticipants: SnapchatUser[]): Message {
   const mapped: Message = {
     _original: JSON.stringify([m]),
     id: m.messageId,
@@ -258,6 +252,18 @@ export function mapMessage(m: TwitterMessage, currentUserID: string, threadParti
     isSender: false,
     senderID: m.senderId,
     text: m.textContent,
+    attachments: []
+  }
+  
+  for (let attachment of m.assets) {
+    let {b64, type} = attachment;
+    mapped.attachments.push({
+      id: 'photo-id',
+      type: AttachmentType[type],
+      srcURL: `data:application/octet-stream;base64,${encodeURIComponent(b64)}`,
+      // fileName: 'test.png',//path.basename(photo.media_url_https),
+      // size: {width: 100, height: 100}//pick(photo.original_info, ['width', 'height']),
+    })
   }
   return mapped
   // const type = Object.keys(m)[0]

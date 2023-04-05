@@ -11,15 +11,23 @@ function select(q, obj, dict) {
     'senderId': '_2[0]_1[0]',
     'convoId': '_3[0]_1[0]_1[0]_1[0]',
     'textContent': '_4[0]_4[0]_2[0]_1[0]',
+    'slideupText': '_4[0]_4[0]_7_11_1',
+    'snapType': '_4[0]_9[0]_1[0]',
+    'seenByInfo': '_6[0]',
     'messageIdProbably': '_7[0]',
     'assetInfo': '_4[0]._5',
     'assetEncryptionInfo': '_4[0]._4[0]._3[0]._3',
     'timestamp': '_6[0]_1[0]',
+    'savedFromUser': '_4[0]_4[0]_8[0]_7[0]_1[0]_1[0]',
+    'snapWebMessage': '_4[0]_4[0]_8[0]_17[0]', // this is a guess. might not be what this means.
+    'deleteType': '_4[0]_4[0]_8[0]_5[0]_2',
     // obj is assetInfo
     'assetId': '_1[0]._3[0]._2[0]._2[0]',
     // obj is assetEncryptionInfo
     'encryptionKey': '_5[0]._1[0]._1[0]._19[0]._1[0]', // _4[0]._4[0]._3[0]._3[0]._5[0]._1[0]._1[0]._4[0]._1[0] // same thing but base64 encoded again?
     'encryptionIV': '_5[0]._1[0]._1[0]._19[0]._2[0]', // _4[0]._4[0]._3[0]._3[0]._5[0]._1[0]._1[0]._4[0]._2[0] // same thing but base64 encoded again?    
+    // obj is seenByInfo
+    'seenByUsers': '_4',
   };
 
   try {
@@ -31,7 +39,8 @@ function select(q, obj, dict) {
       obj = obj[`_${k}`];
       if (i) obj = obj[parseInt(i)];
     }
-    return obj || null;
+    // return obj || null;
+    return obj;
   } catch (e) {
     return null;
   }
@@ -58,119 +67,6 @@ async function SyncConversations(arrayBuffer, x=0) {
   try {
     let proto = await generateProto(buffer);
     proto = `package snap;\nsyntax = "proto3";\nmessage Schema ${proto.substr(proto.indexOf('{'))}`;
-//     proto = `package snap;
-// syntax = "proto3";
-// message Schema {
-//   repeated int64 _0 = 0;
-//   message a2 {
-//     message a3 {
-//       message a4 {
-//         repeated bytes _1 = 1;
-//       }
-//       repeated a4 _1 = 1;
-
-//       repeated int64 _2 = 2;
-//     }
-//     repeated a3 _1 = 1;
-
-//     message a7 {
-//       message a8 {
-//         message a9 {
-//           message aa {
-//             repeated int64 _1 = 1;
-//             repeated int64 _2 = 2;
-//           }
-//           repeated aa _1 = 1;
-
-//           message ad {
-//             repeated int64 _1 = 1;
-//             repeated int64 _2 = 2;
-//           }
-//           repeated ad _2 = 2;
-
-//         }
-//         repeated a9 _2 = 2;
-
-//       }
-//       repeated a8 _1 = 1;
-
-//     }
-//     repeated a7 _2 = 2;
-
-//     repeated int64 _3 = 3;
-//     message a11 {
-//       repeated int64 _2 = 2;
-//       message a13 {
-//         repeated bytes _1 = 1;
-//       }
-//       repeated a13 _3 = 3;
-
-//       message a15 {
-//         repeated bytes _1 = 1;
-//       }
-//       repeated a15 _4 = 4;
-
-//       message a17 {
-//         repeated int64 _1 = 1;
-//       }
-//       repeated a17 _11 = 11;
-
-//     }
-//     repeated a11 _6 = 6;
-
-//     message a19 {
-//       repeated bytes _1 = 1;
-//     }
-//     repeated a19 _7 = 7;
-
-//     message a1b {
-//       repeated int64 _1 = 1;
-//     }
-//     repeated a1b _10 = 10;
-
-//     repeated bytes _11 = 11;
-//   }
-//   repeated a2 _1 = 1;
-
-//   message a1e {
-//     message a1f {
-//       repeated int64 _2 = 2;
-//     }
-//     repeated a1f _1 = 1;
-
-//     message a21 {
-//       message a22 {
-//         repeated bytes _1 = 1;
-//       }
-//       repeated a22 _1 = 1;
-
-
-//       repeated int64 _2 = 2;
-
-//     }
-//     repeated a21 _3 = 3;
-
-//     repeated int64 _4 = 4;
-//   }
-//   repeated a1e _2 = 2;
-
-//   repeated int64 _4 = 4;
-//   message a29 {
-//     message a2a {
-//       repeated int64 _0 = 0;
-//       repeated int64 _1 = 1;
-//     }
-//     repeated a2a _1 = 1;
-
-//     message a2d {
-//       repeated bytes _1 = 1;
-//     }
-//     repeated a2d _2 = 2;
-
-//   }
-//   repeated int64 _6 = 6;
-
-// }`;
 
     let root = protobuf.parse(proto).root;
     const Schema = root.lookupType('snap.Schema');
@@ -195,6 +91,403 @@ async function QueryMessages(arrayBuffer) {
   buffer = buffer.slice(sliceIdx); // remove content length prefix
   let proto = await generateProto(buffer, true);
   proto = `package snap;\nsyntax = "proto3";\nmessage QueryMessagesResponse_Generated ${proto.substr(proto.indexOf('{'))}`;
+
+proto = `
+package snap;
+syntax = "proto3";
+message QueryMessagesResponse_Generated {
+  repeated int64 _0 = 0;
+  message a2 {
+    repeated int64 _1 = 1;
+    message a4 {
+      repeated bytes _1 = 1;
+    }
+    repeated a4 _2 = 2;
+
+    message a6 {
+      message a7 {
+        message a8 {
+          repeated bytes _1 = 1;
+        }
+        repeated a8 _1 = 1;
+
+        repeated int64 _2 = 2;
+      }
+      repeated a7 _1 = 1;
+
+      message ab {
+        repeated bytes _1 = 1;
+      }
+      repeated ab _99 = 99;
+
+    }
+    repeated a6 _3 = 3;
+
+    message ad {
+      repeated int64 _2 = 2;
+      message af {
+        repeated bytes _1 = 1;
+      }
+      repeated af _3 = 3;
+
+      message a11 {
+        message a12 {
+          repeated string _1 = 1;
+          message a14 {
+            message a15 {
+              repeated int64 _2 = 2;
+            }
+            repeated a15 _1 = 1;
+
+            message a17 {
+              repeated bytes _2 = 2;
+            }
+            repeated a17 _4 = 4;
+
+          }
+          repeated a14 _2 = 2;
+
+        }
+        repeated a12 _2 = 2;
+
+        message a19 {
+          message a1a {
+            message a1b {
+              repeated bytes _2 = 2;
+              message a1d {
+                repeated bytes _1 = 1;
+                message a1f {
+                  repeated bytes _2 = 2;
+                  repeated bytes _3 = 3;
+                  repeated bytes _6 = 6;
+                  repeated int64 _9 = 9;
+                  repeated int64 _10 = 10;
+                  repeated int64 _12 = 12;
+                }
+                repeated a1f _2 = 2;
+
+              }
+              repeated a1d _3 = 3;
+
+              repeated int64 _8 = 8;
+            }
+            repeated a1b _4 = 4;
+
+            message a27 {
+              message a28 {
+                message a29 {
+                  repeated int64 _2 = 2;
+                  message a2b {
+                    repeated bytes _1 = 1;
+                    repeated bytes _2 = 2;
+                  }
+                  repeated a2b _4 = 4;
+
+                  message a2e {
+                    repeated int64 _1 = 1;
+                    repeated int64 _2 = 2;
+                  }
+                  repeated a2e _5 = 5;
+
+                  repeated int64 _12 = 12;
+                  repeated int64 _13 = 13;
+                  repeated int64 _15 = 15;
+                  repeated bytes _18 = 18;
+                  message a35 {
+                    repeated bytes _1 = 1;
+                    repeated bytes _2 = 2;
+                  }
+                  repeated a35 _19 = 19;
+
+                }
+                repeated a29 _1 = 1;
+
+              }
+              repeated a28 _1 = 1;
+
+              message a38 {
+                repeated int64 _5 = 5;
+                repeated bytes _6 = 6;
+                repeated int64 _8 = 8;
+              }
+              repeated a38 _2 = 2;
+
+            }
+            repeated a27 _5 = 5;
+
+            repeated bytes _11 = 11;
+            repeated bytes _13 = 13;
+            message a3e {
+              repeated int64 _6 = 6;
+            }
+            repeated a3e _17 = 17;
+
+            message a40 {
+              repeated int64 _4 = 4;
+            }
+            repeated a40 _22 = 22;
+
+            message a42 {
+              repeated int64 _1 = 1;
+              repeated int64 _2 = 2;
+            }
+            repeated a42 _28 = 28;
+
+          }
+          repeated a1a _3 = 3;
+
+        }
+        repeated a19 _3 = 3;
+
+        message Slideup {
+          message TextContent {
+            optional string _1 = 1;
+          }
+          optional TextContent _11 = 11;
+        }
+        optional Slideup _7 = 7;
+
+        message a45 {
+          message DeleteInfo {
+            message Message {
+              optional string _1 = 1;
+            }
+            optional Message _1 = 1;
+            optional int64 _2 = 2;
+          }
+          repeated DeleteInfo _5 = 5;
+
+          message a46 {
+            message a47 {
+              repeated bytes _1 = 1;
+            }
+            repeated a47 _1 = 1;
+
+            repeated int64 _2 = 2;
+            message a4a {
+              repeated int64 _1 = 1;
+              repeated int64 _2 = 2;
+            }
+            repeated a4a _3 = 3;
+
+          }
+          repeated a46 _7 = 7;
+
+          repeated string _17 = 17;
+
+        }
+        repeated a45 _8 = 8;
+
+        message a4d {
+          message a4e {
+            repeated bytes _5 = 5;
+          }
+          repeated a4e _4 = 4;
+
+          message a50 {
+            message a51 {
+              message a52 {
+                repeated int64 _2 = 2;
+                repeated int64 _3 = 3;
+                message a55 {
+                  repeated bytes _1 = 1;
+                  repeated bytes _2 = 2;
+                }
+                repeated a55 _4 = 4;
+
+                message a58 {
+                  repeated int64 _1 = 1;
+                  repeated int64 _2 = 2;
+                }
+                repeated a58 _5 = 5;
+
+                repeated int64 _12 = 12;
+                repeated int64 _13 = 13;
+                repeated int64 _15 = 15;
+                repeated bytes _18 = 18;
+                message a5f {
+                  repeated bytes _1 = 1;
+                  repeated bytes _2 = 2;
+                }
+                repeated a5f _19 = 19;
+
+              }
+              repeated a52 _1 = 1;
+
+            }
+            repeated a51 _1 = 1;
+
+            message a62 {
+              repeated int64 _5 = 5;
+              repeated bytes _6 = 6;
+            }
+            repeated a62 _2 = 2;
+
+          }
+          repeated a50 _5 = 5;
+
+          message a65 {
+            message a66 {
+              message a67 {
+                message a68 {
+                  repeated bytes _12 = 12;
+                }
+                repeated a68 _2 = 2;
+
+              }
+              repeated a67 _1 = 1;
+
+            }
+            repeated a66 _4 = 4;
+
+          }
+          repeated a65 _13 = 13;
+
+          message a6a {
+            repeated int64 _5 = 5;
+            repeated int64 _7 = 7;
+          }
+          repeated a6a _17 = 17;
+
+        }
+        repeated bytes _11 = 11;
+
+      }
+      repeated a11 _4 = 4;
+
+      message a6d {
+        message a6e {
+          message a6f {
+            repeated bytes _1 = 1;
+            message a71 {
+              repeated bytes _2 = 2;
+              repeated bytes _3 = 3;
+              repeated bytes _6 = 6;
+              repeated int64 _9 = 9;
+              repeated int64 _10 = 10;
+              message a77 {
+                repeated int64 _1 = 1;
+              }
+              repeated a77 _11 = 11;
+
+              repeated int64 _12 = 12;
+            }
+            repeated a71 _2 = 2;
+
+          }
+          repeated a6f _3 = 3;
+
+          repeated int64 _6 = 6;
+          repeated int64 _8 = 8;
+        }
+        repeated a6e _1 = 1;
+
+      }
+      message assetInfo {
+        message x {
+          message xx {
+            message xxx {
+              repeated bytes _2 = 2;
+            }
+            repeated xxx _2 = 2;
+          }
+          repeated xx _3 = 3;
+        }
+        repeated x _1 = 1;
+      }
+      repeated assetInfo _5 = 5;
+
+      repeated bytes _6 = 6;
+      repeated int64 _7 = 7;
+      message a7e {
+        message a7f {
+          message a80 {
+            repeated int64 _1 = 1;
+          }
+          repeated a80 _1 = 1;
+
+        }
+        repeated a7f _1 = 1;
+
+      }
+      repeated a7e _8 = 8;
+
+      message a82 {
+        repeated bytes _1 = 1;
+        message a84 {
+          repeated bytes _5 = 5;
+        }
+        repeated a84 _2 = 2;
+
+      }
+      repeated a82 _9 = 9;
+
+    }
+    repeated ad _4 = 4;
+
+    repeated int64 _5 = 5;
+    message a87 {
+      repeated int64 _1 = 1;
+      repeated int64 _2 = 2;
+      message a8a {
+        repeated bytes _1 = 1;
+      }
+      repeated a8a _4 = 4;
+
+      message a8c {
+        repeated bytes _1 = 1;
+      }
+      repeated a8c _6 = 6;
+
+      message a8e {
+        repeated bytes _1 = 1;
+      }
+      repeated a8e _8 = 8;
+
+      message a90 {
+        repeated bytes _1 = 1;
+      }
+      repeated a90 _10 = 10;
+
+      repeated int64 _11 = 11;
+      message a93 {
+        repeated int64 _1 = 1;
+      }
+      repeated a93 _12 = 12;
+
+      message a95 {
+        message a96 {
+          repeated bytes _1 = 1;
+        }
+        repeated a96 _1 = 1;
+
+        message a98 {
+          repeated int64 _1 = 1;
+        }
+        repeated a98 _2 = 2;
+
+        repeated int64 _3 = 3;
+      }
+      repeated a95 _14 = 14;
+
+    }
+    repeated a87 _6 = 6;
+
+    repeated int64 _7 = 7;
+    message a9c {
+      message a9d {
+        repeated bytes _1 = 1;
+      }
+      repeated a9d _1 = 1;
+
+    }
+    repeated a9c _9 = 9;
+
+  }
+  repeated a2 _1 = 1;
+
+}
+  `
 
   // let root = await protobuf.load('snap.proto');
   let root = protobuf.parse(proto).root;

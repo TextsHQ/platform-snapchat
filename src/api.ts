@@ -47,6 +47,7 @@ export default class Snapchat implements PlatformAPI {
 
     this.api.sessionCookie = cookieJarJSON.sessionCookie
     this.api.nonceCookie = cookieJarJSON.nonceCookie
+    
     await this.afterAuth()
   }
 

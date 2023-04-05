@@ -34,7 +34,7 @@ const staticFetchHeaders = {
   'sec-fetch-mode': 'cors',
   'sec-fetch-site': 'same-origin',
   'x-grpc-web': '1',
-  'x-snap-device-info': 'CggKBAgMEA0QBBICCAcaBzEyLjEzLjA=',
+  // 'x-snap-device-info': 'CggKBAgMEA0QBBICCAcaBzEyLjEzLjA=',
   'x-user-agent': 'grpc-web-javascript/0.1'
 }
 
@@ -104,9 +104,9 @@ export default class SnapchatAPI {
   getUserInfo = async (userId, friendInfo) => {
     let users = friendInfo?.friends?.filter(x => x.user_id === userId);
 
-    if (users.length === 0) users = this.userInfoCache?.filter(x => x.user_id === userId);
+    if (!users || users.length === 0) users = this.userInfoCache?.filter(x => x.user_id === userId);
 
-    if (users.length === 0) {
+    if (!users || users.length === 0) {
       let params = {
         user_ids: JSON.stringify([userId]),
         source: 'CHAT'
@@ -126,10 +126,10 @@ export default class SnapchatAPI {
       let {snapchatters} = await req.json();
 
       users = snapchatters || []
-      if (users.length !== 0) this.userInfoCache.push(...snapchatters);
+      if (!users || users.length !== 0) this.userInfoCache.push(...snapchatters);
     }
 
-    if (users.length === 0) users = [{mutable_username: 'unknown', display: 'unknown'}];
+    if (!users || users.length === 0) users = [{mutable_username: 'unknown', display: 'unknown'}];
 
     return {id: userId, ...users[0]};
     // return {
@@ -166,6 +166,49 @@ export default class SnapchatAPI {
 
   getMessages = (threadID, pagination, userId) => {
     return this.QueryMessages(threadID, pagination, userId)
+  }
+
+  decryptMedia = async ({assetId, encryptionKey, encryptionIV}) => {
+      let req = await fetch(`https://cf-st.sc-cdn.net/c/${assetId}?uc=4`, {
+        "headers": {
+          "accept": "*/*",
+          "accept-language": "en-US,en;q=0.9",
+          "cache-control": "no-cache",
+          "pragma": "no-cache",
+          "sec-ch-ua": "\"Google Chrome\";v=\"111\", \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"111\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "cross-site",
+          "Referer": "https://web.snapchat.com/",
+          "Referrer-Policy": "strict-origin-when-cross-origin"
+        },
+        "body": null,
+        "method": "GET"
+      });
+      let e = await req.arrayBuffer();
+      async function createCryptoKey(key) {
+          // @ts-ignore
+          return crypto.subtle.importKey("raw", key, "AES-CBC", !1, ["decrypt"])
+      }
+
+      async function u(e, o) {
+          // @ts-ignore
+          const r = await crypto.subtle.decrypt({
+              iv: o.iv,
+              name: "AES-CBC"
+          }, o.key, e);
+          if (r instanceof ArrayBuffer)
+              return r;
+          throw new Error("Expected decryption result should be ArrayBuffer")
+      }
+      let o = {key: await createCryptoKey(new Uint8Array(encryptionKey)), iv: new Uint8Array(encryptionIV)};
+      let decrypted = await u(e, o);
+
+      return decrypted;
+      // let blob = new Blob([decrypted]);
+      // return URL.createObjectURL(blob);
   }
 
   sendText = async (threadID, text, senderId) => {
@@ -219,12 +262,50 @@ export default class SnapchatAPI {
       // for now, assume that if this didn't work then there weren't messages
       return [];
     }
-    json = json.map(msg => {
+    json = await Promise.all(json.map(async msg => {
+      let snapWebMessage = Decode.select('snapWebMessage', msg) !== null;
+      let textContent = Decode.select('textContent', msg);
+      let slideupText = Decode.select('slideupText', msg);
+      let savedFromUser = Decode.select('savedFromUser', msg);
+      if (!textContent && savedFromUser) {
+        let uid = formatSnapId(atob(savedFromUser).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+        savedFromUser = await this.getUserInfo(uid, {});
+        textContent = `[saved photo from ${savedFromUser.display_name.toLowerCase()}]`; // temporary
+      }
+
+      let snapType = Decode.select('snapType', msg);
+      if (!textContent && snapType) {
+        textContent = `[(unknown snapType: ${snapType})]`;
+        if (atob(snapType) === atob('EAE=')) {
+          let seenByInfo = Decode.select('seenByInfo', msg);
+          // seenByInfo._1[0] is time sent and _2[0] is another time (first open by anyone?)
+          let seenByUsers = Decode.select('seenByUsers', seenByInfo)
+          textContent = `[image snap sent. seen by ${seenByUsers?.length || 0}]`;
+        } else if (atob(snapType) === atob('CAEQAQ==')) {
+          let seenByInfo = Decode.select('seenByInfo', msg);
+          // seenByInfo._1[0] is time sent and _2[0] is another time (first open by anyone?)
+          let seenByUsers = Decode.select('seenByUsers', seenByInfo)
+          textContent = `[video snap sent. seen by ${seenByUsers?.length || 0}]`;
+        }
+      } else if (slideupText) {
+        textContent = `[slid up on story with message: ${slideupText}]`;
+      } else if (!textContent) {
+        // something before each attachment?
+        // console.log('[nothing]', msg)
+        // textContent = '[nothing]';
+      }
+
+      let deleteType = Decode.select('deleteType', msg);
+      if (deleteType === '1') textContent = '[chat deleted]';
+      if (deleteType === '2') textContent = '[snap deleted]';
+
+      if (snapWebMessage) textContent = '[using snapchat for web message (probably?)]'; // false positives don't appear in snap history, so if this is correct then they eventually hide
       return {
+        snapWebMessage: snapWebMessage,
         messageNumber: parseInt(Decode.select('messageNumber', msg)),
         senderId: formatSnapId(atob(Decode.select('senderId', msg)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')),
         // convoId: formatSnapId(atob(Decode.select('convoId', msg)).split('').map(x => x.charCodeAt().toString(16)).join('')),
-        textContent: Decode.select('textContent', msg),
+        textContent: textContent,
         timestamp: Decode.select('timestamp', msg),
         
         // guessing that mysteryId is really messageId, and messageId is useless?
@@ -244,7 +325,7 @@ export default class SnapchatAPI {
           }
         })(),
 
-        assets: (() => {
+        assets: await (async () => {
           let assetInfo = Decode.select('assetInfo', msg);
           let assetEncryptionInfo = Decode.select('assetEncryptionInfo', msg);
 
@@ -259,13 +340,48 @@ export default class SnapchatAPI {
             asset.assetId = atob(Decode.select('assetId', assetInfo[i]));
             asset.encryptionKey = atob(Decode.select('encryptionKey', assetEncryptionInfo[i])).split('').map(x => x.charCodeAt(0));
             asset.encryptionIV = atob(Decode.select('encryptionIV', assetEncryptionInfo[i])).split('').map(x => x.charCodeAt(0));
+
+            asset.type = 'UNKNOWN';
+            // asset.type = 'IMG';
+
+            // Some images can't be decrypted. Assuming they are using encryptionInfoV1/outdated clients bc error decodes are from the same senders
+            try {
+              let decrypted = await this.decryptMedia(asset);
+              let magicBytesStr = [...new Uint8Array(decrypted)].slice(0, 10).map(x => x.toString(16).padStart(2, '0')).join(' ');
+
+
+              if (magicBytesStr.indexOf('ff d8 ff') === 0) asset.type = 'IMG'; // jpeg
+              if (magicBytesStr.indexOf('89 50 4e') === 0) asset.type = 'IMG'; // png
+              if (magicBytesStr.indexOf('66 74 79') === 0) asset.type = 'VIDEO'; // mp4
+              if (magicBytesStr.indexOf('66 74 79 70') === 0) asset.type = 'VIDEO'; // mov?
+              if (magicBytesStr.indexOf('52 49 46') === 0) asset.type = 'AUDIO'; // wav
+              if (magicBytesStr.indexOf('49 44 33') === 0) asset.type = 'AUDIO'; // mp3
+              if (magicBytesStr.indexOf('ff fb') === 0) asset.type = 'AUDIO'; // mp3
+              if (magicBytesStr.indexOf('ff f3') === 0) asset.type = 'AUDIO'; // mp3
+              if (magicBytesStr.indexOf('ff f2') === 0) asset.type = 'AUDIO'; // mp3
+
+              if (magicBytesStr.indexOf('00 00 00 1c') === 0) asset.type = 'VIDEO'; // snap video
+
+              // 50 4b 03 04 // zip file?
+              // if (asset.type === 'UNKNOWN') console.log(magicBytesStr)
+
+              // let decoded = await this.decryptMedia(asset);
+              let b64 = btoa(String.fromCharCode.apply(null, [...new Uint8Array(decrypted)]));
+              asset.b64 = b64;
+
+              let blob = new Blob([decrypted]);
+              asset.url = URL.createObjectURL(blob);
+
+              // arr.push(blobURL);
+            } catch(e) {}
+
             arr.push(asset);
           }
           return arr;
         })(),
         original: msg
       };
-    });
+    }));
     return json;
   }
 
