@@ -11,6 +11,29 @@ syntax = "proto3";
 
 /* HAND CREATED */
 
+message QueryConversations {
+  message UserInfo {
+    required bytes userId = 1;
+  }
+  required UserInfo _1 = 1;
+
+  required uint64 n = 3;
+
+  message Info {
+    message Last {
+      message ThreadInfo {
+        optional bytes threadId = 1;
+      }
+      optional ThreadInfo _1 = 1;
+      optional uint64 timestamp = 2;
+    }
+    optional Last _3 = 3;
+  }
+  optional Info info = 5;
+
+}
+
+
 message SyncConversations {
   message a1 {
     required bytes userId = 1;
@@ -75,7 +98,7 @@ message UpdateContentMessage {
 }
 
 message QueryMessages {
-  required sint64 cursor = 1; // assuming cursor
+  required uint64 cursor = 1; // assuming cursor
   required Bytes convoInfo = 2;
   required int64 numMessages = 3;
   required Bytes userId = 4;
@@ -175,6 +198,37 @@ message Bytes {
   required bytes bytes = 1;
 }
 `
+
+async function QueryConversations(userId) {
+  let root = protobuf.parse(SNAP_PROTO).root;
+  const Schema = root.lookupType('snap.QueryConversations');
+  const payload = {
+    _1: {
+      userId: parseHexString(userId)
+    },
+    n: 99999,
+    info: {
+      _3: {
+        _1: {
+          // threadId: 'a9yaC4tbQ+ivWWe4XLcDMQ=='
+        },
+        // timestamp: Date.now() + 10000
+      }
+    }
+  };
+
+  let err = Schema.verify(payload);
+  if (err) throw Error(err);
+
+  let message = Schema.create(payload);
+  Schema.encodeDelimitedPadding = message => {
+    let messageBuffer = Schema.encode(message).finish();
+    let prefix = parseHexString(messageBuffer.length.toString(16).padStart(10, '0'));
+    return Buffer.from([...prefix, ...messageBuffer]);
+  }
+  let buffer = Schema.encodeDelimitedPadding(message);
+  return buffer;
+}
 
 async function SyncConversations(userId) {
   // let root = await protobuf.load('snap.proto')
@@ -292,7 +346,7 @@ async function CreateContentMessage(text='test', convoId, userId) {
   return buffer;
 }
 
-async function QueryMessages(convoId, userId) {
+async function QueryMessages(convoId, userId, cursor) {
   // let root = await protobuf.load('snap.proto');
   let root = protobuf.parse(SNAP_PROTO).root;
 
@@ -303,11 +357,11 @@ async function QueryMessages(convoId, userId) {
     userId: {
       bytes: parseHexString(userId)
     },
-    cursor: -4611686018427387904, // goes backwards?
+    cursor: cursor || 999999999,
     convoInfo: {
       bytes: parseHexString(convoId)
     },
-    numMessages: 100
+    numMessages: 50
   };
   // console.log("PAYLOAD", JSON.stringify(payload))
 
@@ -336,4 +390,4 @@ async function QueryMessages(convoId, userId) {
 }
 
 // module.exports = { CreateContentMessage, QueryMessages, UpdateContentMessage, SyncConversations };
-export { CreateContentMessage, QueryMessages, UpdateContentMessage, SyncConversations }
+export { CreateContentMessage, QueryMessages, UpdateContentMessage, SyncConversations, QueryConversations }

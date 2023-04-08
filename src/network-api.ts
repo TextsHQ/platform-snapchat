@@ -161,54 +161,93 @@ export default class SnapchatAPI {
   }
 
   getThreads = (userId, friendInfo) => {
-    return this.SyncConversations(userId, friendInfo)
+    return this.QueryConversations(userId, friendInfo)
   }
 
   getMessages = (threadID, pagination, userId) => {
-    return this.QueryMessages(threadID, pagination, userId)
+    return this.QueryMessages(threadID, pagination?.cursor, userId)
   }
 
-  decryptMedia = async ({assetId, encryptionKey, encryptionIV}) => {
-      let req = await fetch(`https://cf-st.sc-cdn.net/c/${assetId}?uc=4`, {
-        "headers": {
-          "accept": "*/*",
-          "accept-language": "en-US,en;q=0.9",
-          "cache-control": "no-cache",
-          "pragma": "no-cache",
-          "sec-ch-ua": "\"Google Chrome\";v=\"111\", \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"111\"",
-          "sec-ch-ua-mobile": "?0",
-          "sec-ch-ua-platform": "\"macOS\"",
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "cross-site",
-          "Referer": "https://web.snapchat.com/",
-          "Referrer-Policy": "strict-origin-when-cross-origin"
-        },
-        "body": null,
-        "method": "GET"
-      });
-      let e = await req.arrayBuffer();
-      async function createCryptoKey(key) {
-          // @ts-ignore
-          return crypto.subtle.importKey("raw", key, "AES-CBC", !1, ["decrypt"])
-      }
+  
 
-      async function u(e, o) {
-          // @ts-ignore
-          const r = await crypto.subtle.decrypt({
-              iv: o.iv,
-              name: "AES-CBC"
-          }, o.key, e);
-          if (r instanceof ArrayBuffer)
-              return r;
-          throw new Error("Expected decryption result should be ArrayBuffer")
+  decryptMedia = async ({assetId, encryptionKey, encryptionIV}, cdn=0, retries=0) => {
+    const cipher = 'AES-CBC';
+
+    // TODO: figure out which CDN to use. probably in the metadata.
+
+    // TODO: find all CDNs (or complete above todo)
+    // loops through CDNs until it gets a response.
+    const CDNs = [
+      'https://cf-st.sc-cdn.net/c',
+      'https://cf-st.sc-cdn.net/d',
+      'https://bolt-gcdn.sc-cdn.net/3',
+      'https://cf-st.sc-cdn.net/a',
+      'https://cf-st.sc-cdn.net/b', // assuming this exists
+      'https://bolt-gcdn.sc-cdn.net/1', // assuming this exists
+      'https://bolt-gcdn.sc-cdn.net/2', // assuming this exists
+      'https://bolt-gcdn.sc-cdn.net/4' // assuming this exists
+    ];
+
+    if (cdn >= CDNs.length) {
+      // TODO: V1 encryption
+      console.log(`Snapchat decryptMedia: couldn\'t fetch media with id: "${assetId}" - likely missing CDN`);
+      return undefined;
+    }
+
+    const staticHeaders = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\"Google Chrome\";v=\"111\", \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"111\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "Referer": "https://web.snapchat.com/",
+        "Referrer-Policy": "strict-origin-when-cross-origin"
+      };
+
+    let req, encryptedMedia;
+    try {
+      req = await fetch(`${CDNs[cdn]}/${assetId}?uc=4`, { headers: staticHeaders });
+      encryptedMedia = await req.arrayBuffer();
+    } catch (e) {
+      if (e.code === 'ENOTFOUND' && retries === 0)
+        return this.decryptMedia({assetId, encryptionKey, encryptionIV}, cdn, retries + 1);
+
+      console.log(`Snapchat decryptMedia: fatal fetch error`, e);
+      return undefined;
+    }
+
+    try {
+      // @ts-ignore
+      let key = await crypto.subtle.importKey('raw', new Uint8Array(encryptionKey), cipher, false, ['decrypt'])
+
+      // @ts-ignore
+      let decrypted = await crypto.subtle.decrypt({
+        iv: new Uint8Array(encryptionIV),
+        name: cipher
+      }, key, encryptedMedia)
+
+      if (!(decrypted instanceof ArrayBuffer)) {
+        console.log(`Snapchat decryptMedia: expected decryption result should be ArrayBuffer`);
+        return undefined;
       }
-      let o = {key: await createCryptoKey(new Uint8Array(encryptionKey)), iv: new Uint8Array(encryptionIV)};
-      let decrypted = await u(e, o);
 
       return decrypted;
-      // let blob = new Blob([decrypted]);
-      // return URL.createObjectURL(blob);
+    } catch (err) {
+
+      // access denied error -- likely wrong CDN
+      let responseString = [...new Uint8Array(encryptedMedia)].map(c => String.fromCharCode(c)).join('');
+      let xmlResponse = responseString.substring(0, 5) == '<?xml';
+      if (xmlResponse)
+        return this.decryptMedia({assetId, encryptionKey, encryptionIV}, cdn + 1);
+
+      console.log(`Snapchat decryptMedia: couldn\'t decrypt media with id: "${assetId}" - assuming V1 encryption`);
+      return undefined;
+    }
   }
 
   sendText = async (threadID, text, senderId) => {
@@ -226,13 +265,13 @@ export default class SnapchatAPI {
     return await req.text();
   }
 
-  QueryMessages = async (convoId, pagination, userId) => {
+  QueryMessages = async (convoId, cursor, userId) => {
     const formatSnapId = id => `${id.substr(0, 8)}-${id.substr(8, 4)}-${id.substr(12, 4)}-${id.substr(16, 4)}-${id.substr(20)}`;
     const parseBitmojiName = str => {
       // shouldn't need to parse. inconsistency between .proto file and protobuf decoder. also missing a numeric field here
       return str?.split(/[\x01\x1A\x12\(\n]/)?.filter(x => x);
     }
-    let body = await Encode.QueryMessages(convoId, userId);
+    let body = await Encode.QueryMessages(convoId, userId, cursor);
     // console.log([...body]);
     let req = await fetch('https://web.snapchat.com/messagingcoreservice.MessagingCoreService/QueryMessages', {
       'headers': {
@@ -244,18 +283,25 @@ export default class SnapchatAPI {
       'body': body,
       'method': 'POST'
     });
+
+    if (req.status === 429) {
+      // TODO: handle rate limiting
+    }
+
     let buf = await req.arrayBuffer();
     let json;
-    // try {
+    try {
       // console.log('begin decode');
     // console.log([...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join(' '));
       json = await Decode.QueryMessages(buf);
-    // } catch (e) {
+    } catch (e) {
+      console.log("DECODE FAILED FOR:")
+      console.log([...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join(' '));
       // console.log(e);
       // WRONG DATA TYPE USED FOR CURSOR.
       // for now, assume that if this didn't work then there weren't messages
       // return [];
-    // }
+    }
     json = Decode.select('messages', json);
     if (!json) {
       // WRONG DATA TYPE USED FOR CURSOR.
@@ -295,12 +341,34 @@ export default class SnapchatAPI {
         // textContent = '[nothing]';
       }
 
-      let deleteType = Decode.select('deleteType', msg);
-      if (deleteType === '1') textContent = '[chat deleted]';
-      if (deleteType === '2') textContent = '[snap deleted]';
+      let isAction = false;
+      let isDeleted = false;
+      let isHidden = false;
 
-      if (snapWebMessage) textContent = '[using snapchat for web message (probably?)]'; // false positives don't appear in snap history, so if this is correct then they eventually hide
+      let deleteType = Decode.select('deleteType', msg);
+      if (deleteType === '1' || deleteType === '2') {
+        textContent = 'chat deleted';
+        isDeleted = true;
+        if (deleteType === '2') textContent = 'snap deleted';
+      }
+
+      let reactions = Decode.select('reactions', msg);
+      if (reactions) reactions = reactions.map(r => {
+        return {
+          senderId: formatSnapId(atob(r._1[0]._1[0]).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')),
+          reaction_key: r._2[0]._1[0],
+          messageNumber: parseInt(r._3[0])
+        }
+      });
+
+      // this is *probably* the "X is using Snapchat for web" message
+      if (snapWebMessage) isHidden = true;
       return {
+        isAction: isAction,
+        isDeleted: isDeleted,
+        isHidden: isHidden,
+        reactions: reactions || false,
+        repliedTo: parseInt(Decode.select('repliedTo', msg)) || false,
         snapWebMessage: snapWebMessage,
         messageNumber: parseInt(Decode.select('messageNumber', msg)),
         senderId: formatSnapId(atob(Decode.select('senderId', msg)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')),
@@ -308,22 +376,22 @@ export default class SnapchatAPI {
         textContent: textContent,
         timestamp: Decode.select('timestamp', msg),
         
-        // guessing that mysteryId is really messageId, and messageId is useless?
-        messageId: parseInt(Decode.select('messageIdProbably', msg)) || 'none?',
-        mysteryId: (() => {
-          try {
-            // not sure about _9[0]_1[0]_1[0]
-            let x = formatSnapId(atob(msg?._9[0]?._1[0]?._1[0]).split('').map(x => x.charCodeAt(0).toString(16)).join('')); // maybe this is the message id?
-            return x;
-          } catch (e) {
-            try {
-              // not sure about indexing
-              return msg._9[0]._2[0];
-            } catch (e) {
-              return 'none?';
-            }
-          }
-        })(),
+        // // guessing that mysteryId is really messageId, and messageId is useless?
+        // messageId: parseInt(Decode.select('messageIdProbably', msg)) || 'none?',
+        // mysteryId: (() => {
+        //   try {
+        //     // not sure about _9[0]_1[0]_1[0]
+        //     let x = formatSnapId(atob(msg?._9[0]?._1[0]?._1[0]).split('').map(x => x.charCodeAt(0).toString(16)).join('')); // maybe this is the message id?
+        //     return x;
+        //   } catch (e) {
+        //     try {
+        //       // not sure about indexing
+        //       return msg._9[0]._2[0];
+        //     } catch (e) {
+        //       return 'none?';
+        //     }
+        //   }
+        // })(),
 
         assets: await (async () => {
           let assetInfo = Decode.select('assetInfo', msg);
@@ -343,6 +411,12 @@ export default class SnapchatAPI {
 
             asset.type = 'UNKNOWN';
             // asset.type = 'IMG';
+
+            // TODO: examine this
+            if (JSON.stringify(asset.encryptionKey) ==  JSON.stringify([158, 233, 101])) {
+              console.log("caught-early");
+              return arr;
+            }
 
             // Some images can't be decrypted. Assuming they are using encryptionInfoV1/outdated clients bc error decodes are from the same senders
             try {
@@ -365,15 +439,10 @@ export default class SnapchatAPI {
               // 50 4b 03 04 // zip file?
               // if (asset.type === 'UNKNOWN') console.log(magicBytesStr)
 
-              // let decoded = await this.decryptMedia(asset);
-              let b64 = btoa(String.fromCharCode.apply(null, [...new Uint8Array(decrypted)]));
-              asset.b64 = b64;
-
-              let blob = new Blob([decrypted]);
-              asset.url = URL.createObjectURL(blob);
-
-              // arr.push(blobURL);
-            } catch(e) {}
+              asset.b64 = Buffer.from(decrypted).toString('base64');
+            } catch(e) {
+              console.log('Snapchat media error', e);
+            }
 
             arr.push(asset);
           }
@@ -385,10 +454,10 @@ export default class SnapchatAPI {
     return json;
   }
 
-  SyncConversations = async (userId: string, friendInfo: any) => {
+  QueryConversations = async (userId: string, friendInfo: any) => {
     const formatSnapId = id => `${id.substr(0, 8)}-${id.substr(8, 4)}-${id.substr(12, 4)}-${id.substr(16, 4)}-${id.substr(20)}`;
-    let body = await Encode.SyncConversations(userId);
-    let req = await fetch('https://web.snapchat.com/messagingcoreservice.MessagingCoreService/SyncConversations', {
+    let body = await Encode.QueryConversations(userId);
+    let req = await fetch('https://web.snapchat.com/messagingcoreservice.MessagingCoreService/QueryConversations', {
       'headers': {
         'authorization': `Bearer ${this.BEARER_TOKEN}`,
         'cookie': `sc-a-nonce=${this.nonceCookie}`,
@@ -414,6 +483,7 @@ export default class SnapchatAPI {
       'id': '_1[0]',
       // 'userId1': '_7[0]_1[0]',
       // 'userId2': '_7[1]_1[0]',
+      'lastActive': '_3[0]'
     };
     json = Decode.select('conversations', json, dict);
     json = await Promise.all(json.map(async x => {
@@ -426,9 +496,57 @@ export default class SnapchatAPI {
         convoId: formatSnapId(atob(Decode.select('convoId', x, dict)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')),
         participants: participants,
         name: name ? atob(name) : displayNames.join(', '),
-        original: x
+        original: x,
+        lastTimestamp: parseInt(Decode.select('lastActive', x, dict))
       }
     }));
     return json;
   }
+
+  // SyncConversations = async (userId: string, friendInfo: any) => {
+  //   const formatSnapId = id => `${id.substr(0, 8)}-${id.substr(8, 4)}-${id.substr(12, 4)}-${id.substr(16, 4)}-${id.substr(20)}`;
+  //   let body = await Encode.SyncConversations(userId);
+  //   let req = await fetch('https://web.snapchat.com/messagingcoreservice.MessagingCoreService/SyncConversations', {
+  //     'headers': {
+  //       'authorization': `Bearer ${this.BEARER_TOKEN}`,
+  //       'cookie': `sc-a-nonce=${this.nonceCookie}`,
+  //       ...staticFetchHeaders
+  //     },
+  //     'referrerPolicy': 'strict-origin-when-cross-origin',
+  //     'body': body,
+  //     'method': 'POST'
+  //   });
+  //   let buf = await req.arrayBuffer();
+  //   let json = await Decode.SyncConversations(buf);
+
+  //   let dict = {
+  //     // obj is SyncConversationsResponse
+  //     'conversations': '_1',
+
+  //     // obj is conversation
+  //     'convoId': '_1[0]_1[0]_1[0]',
+  //     'userIds': '_7',
+  //     'gcName': '_9[0]', // if any
+
+  //     // obj is single userId
+  //     'id': '_1[0]',
+  //     // 'userId1': '_7[0]_1[0]',
+  //     // 'userId2': '_7[1]_1[0]',
+  //   };
+  //   json = Decode.select('conversations', json, dict);
+  //   json = await Promise.all(json.map(async x => {
+  //     let ids = Decode.select('userIds', x, dict);
+  //     let name = Decode.select('gcName', x, dict);
+  //     let userIds = ids.map(i => formatSnapId(atob(Decode.select('id', i, dict)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')));
+  //     let participants = await Promise.all(userIds.map(x => this.getUserInfo(x, friendInfo)));
+  //     let displayNames = participants.filter(x => x.id !== userId).map(x => x.display ? x.display : x.mutable_username);
+  //     return {
+  //       convoId: formatSnapId(atob(Decode.select('convoId', x, dict)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')),
+  //       participants: participants,
+  //       name: name ? atob(name) : displayNames.join(', '),
+  //       original: x
+  //     }
+  //   }));
+  //   return json;
+  // }
 }

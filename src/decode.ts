@@ -15,17 +15,19 @@ function select(q, obj, dict) {
     'snapType': '_4[0]_9[0]_1[0]',
     'seenByInfo': '_6[0]',
     'messageIdProbably': '_7[0]',
-    'assetInfo': '_4[0]._5',
-    'assetEncryptionInfo': '_4[0]._4[0]._3[0]._3',
+    'assetInfo': '_4[0]_5',
+    'assetEncryptionInfo': '_4[0]_4[0]_3[0]_3',
     'timestamp': '_6[0]_1[0]',
     'savedFromUser': '_4[0]_4[0]_8[0]_7[0]_1[0]_1[0]',
     'snapWebMessage': '_4[0]_4[0]_8[0]_17[0]', // this is a guess. might not be what this means.
     'deleteType': '_4[0]_4[0]_8[0]_5[0]_2',
+    'repliedTo': '_6[0]_12[0]_1[0]',
+    'reactions': '_6[0]_14',
     // obj is assetInfo
-    'assetId': '_1[0]._3[0]._2[0]._2[0]',
+    'assetId': '_1[0]_3[0]_2[0]_2[0]',
     // obj is assetEncryptionInfo
-    'encryptionKey': '_5[0]._1[0]._1[0]._19[0]._1[0]', // _4[0]._4[0]._3[0]._3[0]._5[0]._1[0]._1[0]._4[0]._1[0] // same thing but base64 encoded again?
-    'encryptionIV': '_5[0]._1[0]._1[0]._19[0]._2[0]', // _4[0]._4[0]._3[0]._3[0]._5[0]._1[0]._1[0]._4[0]._2[0] // same thing but base64 encoded again?    
+    'encryptionKey': '_5[0]_1[0]_1[0]_19[0]_1[0]', // _4[0]._4[0]._3[0]._3[0]._5[0]._1[0]._1[0]._4[0]._1[0] // same thing but base64 encoded again?
+    'encryptionIV': '_5[0]_1[0]_1[0]_19[0]_2[0]', // _4[0]._4[0]._3[0]._3[0]._5[0]._1[0]._1[0]._4[0]._2[0] // same thing but base64 encoded again?    
     // obj is seenByInfo
     'seenByUsers': '_4',
   };
@@ -97,7 +99,7 @@ package snap;
 syntax = "proto3";
 message QueryMessagesResponse_Generated {
   repeated int64 _0 = 0;
-  message a2 {
+  message Message {
     repeated int64 _1 = 1;
     message a4 {
       repeated bytes _1 = 1;
@@ -249,10 +251,10 @@ message QueryMessagesResponse_Generated {
 
         message a45 {
           message DeleteInfo {
-            message Message {
+            message Message2 {
               optional string _1 = 1;
             }
-            optional Message _1 = 1;
+            optional Message2 _1 = 1;
             optional int64 _2 = 2;
           }
           repeated DeleteInfo _5 = 5;
@@ -450,10 +452,10 @@ message QueryMessagesResponse_Generated {
       repeated a90 _10 = 10;
 
       repeated int64 _11 = 11;
-      message a93 {
+      message RespondedTo {
         repeated int64 _1 = 1;
       }
-      repeated a93 _12 = 12;
+      repeated RespondedTo _12 = 12;
 
       message a95 {
         message a96 {
@@ -484,7 +486,7 @@ message QueryMessagesResponse_Generated {
     repeated a9c _9 = 9;
 
   }
-  repeated a2 _1 = 1;
+  repeated Message _1 = 1;
 
 }
   `

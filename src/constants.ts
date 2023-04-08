@@ -5,11 +5,9 @@ export const supportedReactions: Record<string, SupportedReaction> = {
   like: { title: 'Like', render: '👍' },
   dislike: { title: 'Dislike', render: '👎' },
   laugh: { title: 'Laugh', render: '😂' },
-  surprised: { title: 'Surprised', render: '😲' },
+  shocked: { title: 'Shocked', render: '🤯' },
   cry: { title: 'Cry', render: '😢' },
   fire: { title: 'Lit', render: '🔥' },
-  angry: { title: 'Angry', render: '😠', disabled: true },
-  mask: { title: 'Mask', render: '😷', disabled: true },
 }
 
 export const enum MessageType {

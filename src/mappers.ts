@@ -133,7 +133,7 @@ export function mapThread(thread: SnapchatThread, currentUserSc: SnapchatUser): 
     },
     title: thread.name,
     // timestamp: +thread.sort_timestamp ? new Date(+thread.sort_timestamp) : undefined,
-    timestamp: undefined,
+    timestamp: new Date(thread.lastTimestamp),
     type: participants.length > 1 ? 'group' : 'single',
   }
 
@@ -141,26 +141,16 @@ export function mapThread(thread: SnapchatThread, currentUserSc: SnapchatUser): 
 }
 
 const REACTION_MAP_TO_NORMALIZED = {
-  funny: 'laugh',
-  surprised: 'surprised',
-  sad: 'cry',
-  like: 'heart',
-  excited: 'fire',
-  agree: 'like',
-  disagree: 'dislike',
+  '1': 'heart',
+  '2': 'laugh',
+  '3': 'fire',
+  '4': 'like',
+  '5': 'dislike',
+  '6': 'cry',
+  '7': 'shocked'
 }
 
-export const REACTION_MAP_TO_TWITTER = {
-  laugh: 'funny',
-  surprised: 'surprised',
-  cry: 'sad',
-  heart: 'like',
-  fire: 'excited',
-  like: 'agree',
-  dislike: 'disagree',
-}
-
-const mapReaction = ({ sender_id: participantID, reaction_key }: any) => ({
+const mapReaction = ({ senderId: participantID, reaction_key }: any) => ({
   id: participantID,
   participantID,
   reactionKey: REACTION_MAP_TO_NORMALIZED[reaction_key] || reaction_key,
@@ -245,22 +235,27 @@ function mapTweet(tweet: any, user = tweet.user): Tweet {
 export function mapMessage(m: SnapchatMessage, currentUserID: string, threadParticipants: SnapchatUser[]): Message {
   const mapped: Message = {
     _original: JSON.stringify([m]),
-    id: m.messageId,
+    id: m.messageNumber,
     timestamp: new Date(parseInt(m.timestamp)),
-    reactions: [],
+    reactions: mapReactions(m.reactions || []),
     seen: false as MessageSeen,//getSeen(threadParticipants, msg),
-    isSender: false,
+    isSender: m.senderId === currentUserID,
     senderID: m.senderId,
     text: m.textContent,
-    attachments: []
+    attachments: [],
+    linkedMessageID: m.repliedTo,
+    isAction: m.isAction,
+    isDeleted: m.isDeleted,
+    isHidden: m.isHidden,
   }
   
   for (let attachment of m.assets) {
     let {b64, type} = attachment;
+    let MIME_TYPE = type == 'VIDEO' ? 'video/mp4' : 'application/octet-stream';
     mapped.attachments.push({
       id: 'photo-id',
       type: AttachmentType[type],
-      srcURL: `data:application/octet-stream;base64,${encodeURIComponent(b64)}`,
+      srcURL: `data:${MIME_TYPE};base64,${b64}`
       // fileName: 'test.png',//path.basename(photo.media_url_https),
       // size: {width: 100, height: 100}//pick(photo.original_info, ['width', 'height']),
     })

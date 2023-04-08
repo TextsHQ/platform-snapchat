@@ -5,7 +5,7 @@ import { randomUUID as uuid } from 'crypto'
 import { texts, PlatformAPI, OnServerEventCallback, Message, LoginResult, Paginated, Thread, MessageContent, InboxName, MessageSendOptions, PaginationArg, ActivityType, ServerEventType, AccountInfo, User, NotificationsInfo, UserID, PhoneNumber, ThreadFolderName, LoginCreds } from '@textshq/platform-sdk'
 import { pick } from 'lodash'
 
-import { mapThreads, mapMessage, mapMessages, mapEvent, mapUser, REACTION_MAP_TO_TWITTER, mapUserUpdate, mapMessageLink } from './mappers'
+import { mapThreads, mapMessage, mapMessages, mapEvent, mapUser, mapUserUpdate, mapMessageLink } from './mappers'
 import SnapchatAPI from './network-api'
 // import LivePipeline from './LivePipeline'
 import { NOTIFICATIONS_THREAD_ID } from './constants'
@@ -58,7 +58,11 @@ export default class Snapchat implements PlatformAPI {
     threads = await Promise.all(threads.map(async t => {
       return {
         thread: t,
-        messages: await this.getMessages(t.convoId, null)
+        // messages: await this.getMessages(t.convoId, null)
+        messages: {
+          items: [],
+          hasMore: true
+        }
       }
     }));
     let items = mapThreads(threads, this.currentUser);
@@ -78,7 +82,8 @@ export default class Snapchat implements PlatformAPI {
     let items = mapMessages(messages, threadID, this.currentUser.id)
     return {
       items: items,
-      hasMore: null
+      hasMore: items.length !== 0,
+      oldestCursor: items.length > 0 ? items[items.length - 1].id : ""
     }
   }
 
