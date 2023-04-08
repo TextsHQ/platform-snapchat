@@ -309,14 +309,26 @@ export default class SnapchatAPI {
       return [];
     }
     json = await Promise.all(json.map(async msg => {
+      let textHeading: any = false;
+      let textFooter: any = false;
+      let isAction = false;
+      let isDeleted = false;
+      let isHidden = false;
+
+      let senderId = formatSnapId(atob(Decode.select('senderId', msg)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+
       let snapWebMessage = Decode.select('snapWebMessage', msg) !== null;
       let textContent = Decode.select('textContent', msg);
       let slideupText = Decode.select('slideupText', msg);
       let savedFromUser = Decode.select('savedFromUser', msg);
+
+      // fix savedFromUser. doesn't always work & assumes only one user
       if (!textContent && savedFromUser) {
         let uid = formatSnapId(atob(savedFromUser).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
         savedFromUser = await this.getUserInfo(uid, {});
-        textContent = `[saved photo from ${savedFromUser.display_name.toLowerCase()}]`; // temporary
+        let senderUser = await this.getUserInfo(senderId, {});
+        isAction = true;
+        textContent = `${senderUser.display_name} saved snap from ${savedFromUser.display_name}`.toUpperCase();;
       }
 
       let snapType = Decode.select('snapType', msg);
@@ -326,24 +338,29 @@ export default class SnapchatAPI {
           let seenByInfo = Decode.select('seenByInfo', msg);
           // seenByInfo._1[0] is time sent and _2[0] is another time (first open by anyone?)
           let seenByUsers = Decode.select('seenByUsers', seenByInfo)
-          textContent = `[image snap sent. seen by ${seenByUsers?.length || 0}]`;
+          textHeading = `Snap 📸`;
+          textContent = '';
+          textFooter = `Seen by ${seenByUsers?.length || 0}`;
+          // textContent = `[image snap sent. seen by ${seenByUsers?.length || 0}]`;
         } else if (atob(snapType) === atob('CAEQAQ==')) {
           let seenByInfo = Decode.select('seenByInfo', msg);
           // seenByInfo._1[0] is time sent and _2[0] is another time (first open by anyone?)
           let seenByUsers = Decode.select('seenByUsers', seenByInfo)
-          textContent = `[video snap sent. seen by ${seenByUsers?.length || 0}]`;
+          textHeading = `Snap 🎥`;
+          textContent = '';
+          textFooter = `Seen by ${seenByUsers?.length || 0}`;
+          // textContent = `[video snap sent. seen by ${seenByUsers?.length || 0}]`;
         }
       } else if (slideupText) {
-        textContent = `[slid up on story with message: ${slideupText}]`;
+        // textHeading = 'Story Response'
+        textFooter = 'story reply';
+        textContent = slideupText;
+        // textContent = `[slid up on story with message: ${slideupText}]`;
       } else if (!textContent) {
         // something before each attachment?
         // console.log('[nothing]', msg)
         // textContent = '[nothing]';
       }
-
-      let isAction = false;
-      let isDeleted = false;
-      let isHidden = false;
 
       let deleteType = Decode.select('deleteType', msg);
       if (deleteType === '1' || deleteType === '2') {
@@ -364,14 +381,12 @@ export default class SnapchatAPI {
       // this is *probably* the "X is using Snapchat for web" message
       if (snapWebMessage) isHidden = true;
       return {
-        isAction: isAction,
-        isDeleted: isDeleted,
-        isHidden: isHidden,
+        textHeading, textFooter, isAction, isDeleted, isHidden,
         reactions: reactions || false,
         repliedTo: parseInt(Decode.select('repliedTo', msg)) || false,
         snapWebMessage: snapWebMessage,
         messageNumber: parseInt(Decode.select('messageNumber', msg)),
-        senderId: formatSnapId(atob(Decode.select('senderId', msg)).split('').map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('')),
+        senderId: senderId,
         // convoId: formatSnapId(atob(Decode.select('convoId', msg)).split('').map(x => x.charCodeAt().toString(16)).join('')),
         textContent: textContent,
         timestamp: Decode.select('timestamp', msg),

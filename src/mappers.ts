@@ -247,6 +247,8 @@ export function mapMessage(m: SnapchatMessage, currentUserID: string, threadPart
     isAction: m.isAction,
     isDeleted: m.isDeleted,
     isHidden: m.isHidden,
+    textHeading: m.textHeading,
+    textFooter: m.textFooter
   }
   
   for (let attachment of m.assets) {
