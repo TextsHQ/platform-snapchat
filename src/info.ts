@@ -28,7 +28,7 @@ const info: PlatformInfo = {
     // url: 'https://accounts.snapchat.com/accounts/v2/login',
     url: 'https://accounts.snapchat.com/accounts/v2/login?continue=%2Faccounts%2Fsso%3Freferrer%3Dhttps%253A%252F%252Fweb.snapchat.com%252F%26client_id%3Dweb-calling-corp--prod',
     // authCookieName: '__Host-sc-a-session', // and __Host-sc-a-nonce
-    authCookieName: '__Host-sc-a-nonce',
+    // authCookieName: '__Host-sc-a-nonce',
     runJSOnNavigate: `
       // // hide close button on login page on mobile
       // const ss = document.createElement('style')
