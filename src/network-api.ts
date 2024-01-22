@@ -42,30 +42,66 @@ const API_ENDPOINT = 'https://web.snapchat.com/'
 const GRAPHQL_ENDPOINT = 'https://web.snapchat.com/web-calling-api/graphql'
 
 export default class SnapchatAPI {
+  hostSnapClientCookie: string = ''
   sessionCookie: string = ''
   nonceCookie: string = ''
   private BEARER_TOKEN: string = ''
+  private USER_SCUID: string = ''
   private userInfoCache: any = []
 
   genAuthToken = async () => {
     if (!this.sessionCookie || !this.nonceCookie) throw new Error('Snapchat missing authentication cookies')
 
     let req = await fetch('https://accounts.snapchat.com/accounts/sso?client_id=web-calling-corp--prod', {
-      headers: {
-        'pragma': 'no-cache',
-        'cache-control': 'no-cache',
+      headers: {      
+        'accept': '*/*',
+        'accept-language': 'en-US,en;q=0.9',
+        'content-length': '0',
+        'cookie': `__Host-X-Snap-Client-Cookie=${this.hostSnapClientCookie}; __Host-sc-a-auth-session=${this.sessionCookie}; sc-a-nonce=${this.nonceCookie}; __Host-sc-a-nonce=${this.nonceCookie};`,
         'origin': 'https://web.snapchat.com',
-        'cookie': `__Host-sc-a-session=${this.sessionCookie}; __Host-sc-a-nonce=${this.nonceCookie};`,
+        'referer': 'https://web.snapchat.com/',
+        'scuid': '1',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-site',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
+      // headers: {
+      //   'pragma': 'no-cache',
+      //   'cache-control': 'no-cache',
+      //   'origin': 'https://web.snapchat.com',
+      //   'cookie': `__Host-sc-a-auth-session=${this.sessionCookie}; __Host-sc-a-nonce=${this.nonceCookie};`,
+      // },
       method: 'POST'
     })
+    const scuid = req.headers.get("scuid")
+    if(scuid) {
+      console.log('Snapchat.genAuthToken - Successfully grabbed user id:', scuid);
+    } else {
+      throw new Error("Snapchat.genAuthToken - Error fetching user's id")
+    }
     let res = await req.text();
-    if (res.length !== 265) throw new Error('Couldn\'t fetch snapchat auth token');
+    if (res.length < 1) throw new Error('Couldn\'t fetch snapchat auth token');
     this.BEARER_TOKEN = res;
+    this.USER_SCUID = scuid;
+  }
+
+  getUserSnapcode = (username: String) => {
+    return `https://app.snapchat.com/web/deeplink/snapcode?username=${username}&type=SVG&bitmoji=enable`
+  }
+
+  fetchCurrentUserInfo = async () => {
+    console.log('Snapchat.fetchCurrentUserInfo')
+    
+    // if not already retrieved, generate current user's auth token and snapchat UID
+    if (!this.BEARER_TOKEN || !this.USER_SCUID) await this.genAuthToken()
+
+    let user_details = await this.getUserInfo(this.USER_SCUID, null)
+    return user_details
   }
 
   fetch = async (options: any, retryNumber = 0, responseType='json') => {
-    if (!this.BEARER_TOKEN) await this.genAuthToken()
+    if (!this.BEARER_TOKEN || !this.USER_SCUID) await this.genAuthToken()
 
     let req = await fetch(options.url, {
       headers: {
@@ -95,13 +131,14 @@ export default class SnapchatAPI {
   }
 
   userInfo = () =>
-    this.fetch({
-      url: GRAPHQL_ENDPOINT,
-      body: '{\"operationName\":\"User\",\"variables\":{},\"query\":\"query User {\\n  user {\\n    id\\n    bitmojiAvatarId: bitmojiAvatarID\\n    bitmojiSelfieId: bitmojiSelfieID\\n    bitmojiBackgroundId: bitmojiBackgroundID\\n    bitmojiSceneId: bitmojiSceneID\\n    isEmployee\\n    username\\n    displayName\\n    snapPrivacy\\n    hasUserSeenDWeb\\n  }\\n}\"}'
-    })
+    // this.fetch({
+    //   url: GRAPHQL_ENDPOINT,
+    //   body: '{\"operationName\":\"User\",\"variables\":{},\"query\":\"query User {\\n  user {\\n    id\\n    bitmojiAvatarId: bitmojiAvatarID\\n    bitmojiSelfieId: bitmojiSelfieID\\n    bitmojiBackgroundId: bitmojiBackgroundID\\n    bitmojiSceneId: bitmojiSceneID\\n    isEmployee\\n    username\\n    displayName\\n    snapPrivacy\\n    hasUserSeenDWeb\\n  }\\n}\"}'
+    // })
+    this.fetchCurrentUserInfo()
 
   // TODO: multiple ids at once
-  getUserInfo = async (userId, friendInfo) => {
+  getUserInfo = async (userId: String, friendInfo?) => {
     let users = friendInfo?.friends?.filter(x => x.user_id === userId);
 
     if (!users || users.length === 0) users = this.userInfoCache?.filter(x => x.user_id === userId);
@@ -113,14 +150,21 @@ export default class SnapchatAPI {
       };
 
       let req = await fetch('https://web.snapchat.com/loq/snapchatter_public_info', {
-        'headers': {
+        headers: {
+          'accept': '*/*',
+          'accept-language': 'en-US,en;q=0.9',
           'authorization': `Bearer ${this.BEARER_TOKEN}`,
+          'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
           'cookie': `sc-a-nonce=${this.nonceCookie}`,
-          ...staticFetchHeaders,
-          'content-type': 'application/x-www-form-urlencoded; charset=utf-8'
+          'origin': 'https://web.snapchat.com',
+          'referer': 'https://web.snapchat.com/',
+          'sec-fetch-dest': 'empty',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'same-origin',
+          'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        'body': querystring.stringify(params),
-        'method': 'POST'
+        body: querystring.stringify(params),
+        method: 'POST'
       });
 
       let {snapchatters} = await req.json();

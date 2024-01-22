@@ -197,8 +197,9 @@ export default class Snapchat implements PlatformAPI {
   login = async ({ cookieJarJSON }: LoginCreds): Promise<LoginResult> => {
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
 
-    this.api.sessionCookie = cookieJarJSON.cookies.filter(x => x.key === '__Host-sc-a-session')[0]?.value
+    this.api.sessionCookie = cookieJarJSON.cookies.filter(x => x.key === '__Host-sc-a-auth-session')[0]?.value
     this.api.nonceCookie = cookieJarJSON.cookies.filter(x => x.key === '__Host-sc-a-nonce')[0]?.value
+    this.api.hostSnapClientCookie = cookieJarJSON.cookies.filter(x => x.key === '__Host-X-Snap-Client-Cookie')[0]?.value
 
     // await this.api.setLoginState(CookieJar.fromJSON(cookieJarJSON as any))
     // accounts.snapchat.com has __Host-sc-a-session, __Host-sc-a-nonce
@@ -213,16 +214,14 @@ export default class Snapchat implements PlatformAPI {
 
   private afterAuth = async () => {
     const userInfo = await this.api.userInfo()
-    if (!userInfo?.data?.user?.id) throw new Error('current user id not present')
-    // this.currentUser = userInfo.data.user;
+    if (!userInfo?.user_id) throw new Error('current user id not present')
+    console.log('Snapchat.afterAuth userinfo:', userInfo)
+
+    // kept fields id, display for backwards compatibility -> we can update these later
     this.currentUser = {
-      id: userInfo.data.user.id,
-      bitmoji_avatar_id: userInfo.data.user?.bitmojiAvatarId,
-      bitmoji_selfie_id: userInfo.data.user?.bitmojiSelfieId,
-      bitmoji_background_id: userInfo.data.user?.bitmojiBackgroundId,
-      bitmoji_scene_id: userInfo.data.user?.bitmojiSceneId,
-      mutable_username: userInfo.data.user?.username,
-      display: userInfo.data.user?.displayName
+      id: userInfo.user_id,
+      display: userInfo.display_name,
+      ...userInfo
     }
 
     const friendInfo = await this.api.getFriends(userInfo.id)
