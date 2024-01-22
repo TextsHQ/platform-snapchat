@@ -11,25 +11,24 @@
     "lint": "yarn eslint src --ext ts,tsx,js,jsx --cache"
   },
   "dependencies": {
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#5f2b77daa0449c65b57d4d6326ff890305a17dcf",
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#60f117cfd188d663246f4a48708576fefa6fdb43",
     "eventsource": "^1.0.7",
     "form-data": "^4.0.0",
     "he": "^1.2.0",
     "jsbi": "^4.3.0",
-    "lodash": "^4.17.20",
+    "lodash": "^4.17.21",
     "mem": "^8.0.0",
     "protobufjs": "^7.2.2",
-    "tough-cookie": "^4.0.0"
+    "react": "https://github.com/TextsHQ/react-global-shim",
+    "tough-cookie": "^4.1.2"
   },
   "devDependencies": {
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#main",
     "@types/eslint": "^8.4.10",
-    "@types/eventsource": "^1.1.5",
-    "@types/he": "^1.1.1",
-    "@types/lodash": "^4.14.168",
-    "@types/node": "^16.11.7",
-    "@types/tough-cookie": "^4.0.0",
+    "@types/lodash": "^4.14.177",
+    "@types/react": "^18.0.31",
     "eslint": "^8.30.0",
+    "protobufjs": "^6.11.2",
     "typescript": "^5.0.2"
   },
   "packageManager": "yarn@3.5.0"
