@@ -1,1 +1,1 @@
-# platform-twitter
+# platform-snapchat
